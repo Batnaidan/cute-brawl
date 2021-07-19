@@ -1,16 +1,16 @@
 import * as THREE from 'three';
-import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 // import {
 //   MapControls,
 //   OrbitControls,
 // } from 'three/examples/jsm/controls/OrbitControls';
-import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls';
 
 import nipplejs from 'nipplejs';
 import './style.css';
-import { LoopOnce } from 'three';
 
+const SPEED = 15;
+const HitBoxSideThreshold = 3.2;
+const CollisionSideThreshold = 2.3;
 let renderer, scene, camera, joyStickInput;
 let prevTime = performance.now();
 let velocity;
@@ -23,14 +23,6 @@ function findTriangleSide(degree, side) {
   let cosine = Math.cos(degree * (Math.PI / 180));
   return { opposite: sine * side, adjacent: cosine * side, degree };
 }
-
-const punchButton = document.querySelector('#punch-button');
-
-punchButton.addEventListener('click', () => {
-  animations.run.stop();
-  animations.punch.reset();
-  animations.punch.play();
-});
 
 let container = document.getElementById('joystick');
 var joyStick = nipplejs.create({
@@ -53,19 +45,19 @@ let characterControls = {
 
 joyStick.on('move', (event, data) => {
   joyStickInput = data;
-  if (_model) {
-    _model.rotation.y = data.angle.radian + Math.PI / 2;
+  if (model1) {
+    model1.scene.rotation.y = data.angle.radian + Math.PI / 2;
     velocity = findTriangleSide(data.angle.degree, data.distance);
-    // _model.position.x += velocity.adjacent / 200;
-    // _model.position.z += -(velocity.opposite / 200);
+    // model1.position.x += velocity.adjacent / 200;
+    // model1.position.z += -(velocity.opposite / 200);
   }
 });
 joyStick.on('end', (event, data) => {
   joyStickInput = null;
-  if (_model) {
+  if (model1) {
     velocity = null;
   }
-  animations.run.stop();
+  model1.animations.runAndPunch.stop();
 });
 
 renderer = new THREE.WebGLRenderer({
@@ -89,48 +81,60 @@ camera = new THREE.PerspectiveCamera(
   1000
 );
 camera.position.z = 5;
-camera.position.y = 2;
+camera.position.y = 5;
 
-let cameraControls = new PointerLockControls(camera, renderer.domElement);
+// let cameraControls = new PointerLockControls(camera, renderer.domElement);
 
 let terrain = new THREE.GridHelper(100, 20, 0x0a0a0a, 0x0a0a0a);
 terrain.position.set(0, -0.5, 0);
 scene.add(terrain);
 
-const loader = new GLTFLoader();
-
-let _model,
-  mixer,
+let mixer,
   animations = {};
-loader.load(
-  './resources/model/modelv2_stand.glb',
-  (model) => {
-    // model.scale.setScalar(0.01);
-    scene.add(model.scene);
-    _model = model.scene;
-    mixer = new THREE.AnimationMixer(_model);
-    animations.stand = mixer.clipAction(model.animations[10]);
-    animations.stand.play();
-    _model.rotation.y = Math.PI;
 
-    loader.load('./resources/model/modelv2_run.glb', (runModel) => {
-      animations.run = mixer.clipAction(runModel.animations[10]);
-    });
-    loader.load('./resources/model/modelv2_punch.glb', (punchModel) => {
-      animations.punch = mixer.clipAction(punchModel.animations[10]);
-      animations.punch.setLoop(LoopOnce);
-    });
-  },
-  (prog) => {
-    console.log(prog);
-  },
-  (err) => {
-    console.log(err);
-  }
-);
-// loader.load('./resources/model/modelv2_run.glb', (model) => {
-//   _;
-// });
+function loadModel(url) {
+  return new Promise((resolve) => {
+    new GLTFLoader().load(url, resolve);
+  });
+}
+
+let model1, model2;
+let p1 = loadModel('./resources/model/modelv2_stand.glb').then((result) => {
+  model1 = result;
+  mixer = new THREE.AnimationMixer(model1.scene);
+  model1.animations.stand = mixer.clipAction(model1.animations[10]);
+  model1.animations.stand.play();
+  model1.scene.rotation.y = Math.PI;
+
+  camera.lookAt(model1.scene.position);
+  loadModel('./resources/model/modelv2_run_with_punch.glb').then((runModel) => {
+    model1.animations.runAndPunch = mixer.clipAction(runModel.animations[0]);
+  });
+});
+let p2 = loadModel('./resources/model/modelv2_stand.glb').then((result) => {
+  model2 = result;
+  mixer = new THREE.AnimationMixer(model2.scene);
+  model2.animations.stand = mixer.clipAction(model2.animations[10]);
+  model2.scene.rotation.y = Math.PI;
+  model2.animations.stand.play();
+
+  camera.lookAt(model2.scene.position);
+  loadModel('./resources/model/modelv2_run_with_punch.glb').then((runModel) => {
+    model2.animations.runAndPunch = mixer.clipAction(runModel.animations[0]);
+  });
+});
+
+Promise.all([p1, p2]).then(() => {
+  console.log(model1);
+  console.log(model2);
+  model1.scene.position.set(0, 0, 0);
+  model1.animations.stand.play();
+  model2.scene.position.set(0, 0, -5);
+  model2.animations.stand.play();
+  //add model to the scene
+  scene.add(model1.scene);
+  scene.add(model2.scene);
+});
 
 function updateMixer(deltaTime) {
   mixer.update(deltaTime);
@@ -147,8 +151,9 @@ function render() {
   const delta = (time - prevTime) / 1000;
   // console.log(delta);
   if (mixer) updateMixer(delta);
-  if (_model) {
+  if (model1) {
     movePlayer(delta);
+    checkCollision();
   }
   // let idealPosition = calculateCameraPosition();
   // let idealLookAt = calculateCameraLook();
@@ -159,10 +164,49 @@ function render() {
 
 function movePlayer(delta) {
   if (velocity) {
-    animations.run.play();
-    _model.position.x += (velocity.adjacent / 10) * delta;
-    _model.position.z += -(velocity.opposite / 10) * delta;
-    cameraControls.moveRight((velocity.adjacent / 10) * delta);
-    cameraControls.moveForward((velocity.opposite / 10) * delta);
+    model1.animations.runAndPunch.play();
+    model1.scene.position.x += (velocity.adjacent / SPEED) * delta;
+    model1.scene.position.z += -(velocity.opposite / SPEED) * delta;
+    camera.position.x += (velocity.adjacent / SPEED) * delta;
+    camera.position.z -= (velocity.opposite / SPEED) * delta;
   }
 }
+function pushEnemyAway() {}
+function checkCollision() {
+  let model1pos = calculateFourSide(model1.scene.position);
+  // console.log(model1pos);
+  // console.log(model1.scene.position);
+  // let model2pos = (calculateFourSide(model2.scene.position);
+  let pos = model2.scene.position;
+  if (model1pos[0].x < pos.x && model1pos[1].x > pos.x) {
+    if (model1pos[0].z > pos.z && model1pos[1].z > pos.z) {
+      console.log('collision');
+    }
+  }
+  // console.log('collision');
+  // } else {
+  //   console.log(pos);
+  //   console.log(model1pos);
+  // }
+}
+function calculateFourSide({ x, z }) {
+  let hitBoxGrid = []; //[0] = A, [1] = B, [2] = C, [3] = D
+  hitBoxGrid.push({
+    x: x - HitBoxSideThreshold / 2,
+    z: z + HitBoxSideThreshold / 2,
+  });
+  hitBoxGrid.push({
+    x: x + HitBoxSideThreshold / 2,
+    z: z + HitBoxSideThreshold / 2,
+  });
+  hitBoxGrid.push({
+    x: x + HitBoxSideThreshold / 2,
+    z: 0,
+  });
+  hitBoxGrid.push({
+    x: x - HitBoxSideThreshold / 2,
+    z: 0,
+  });
+  return hitBoxGrid;
+}
+function calculatePunchRange(x, z) {}
