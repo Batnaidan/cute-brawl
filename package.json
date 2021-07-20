@@ -4,12 +4,14 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "serve": "vite preview"
+    "serve": "vite preview",
+    "expose": "vite --host"
   },
   "devDependencies": {
     "vite": "^2.3.0"
   },
   "dependencies": {
+    "cannon-es": "^0.18.0",
     "nipplejs": "^0.9.0",
     "three": "^0.128.0"
   }
