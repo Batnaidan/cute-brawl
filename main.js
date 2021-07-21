@@ -9,6 +9,9 @@ const SPEED = 15;
 const CAMERAOFFSET = { z: 6 };
 const DAMPING = 0.5;
 const HitBoxSideThreshold = 10;
+const PUSHRANGE = 10;
+const PUSHRADIUS = 120;
+const PUSHRADIAN = PUSHRADIUS * (Math.PI / 180);
 const CollisionSideThreshold = 2.3;
 let renderer, scene, camera, joyStickInput;
 let prevTime = performance.now();
@@ -51,6 +54,8 @@ scene = new THREE.Scene();
 scene.background = new THREE.Color(0xfafafa);
 
 window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
@@ -71,10 +76,12 @@ let terrain = new THREE.GridHelper(100, 20, 0x0a0a0a, 0x0a0a0a);
 terrain.position.set(0, 0, 0);
 scene.add(terrain);
 
-const dummyGeo = new THREE.SphereGeometry(radius / 2);
-const dummy1 = new THREE.Mesh(dummyGeo, generalMaterial);
+const dummy1Geo = new THREE.SphereGeometry(radius / 2);
+const dummy1 = new THREE.Mesh(dummy1Geo, generalMaterial);
 dummy1.position.set(0, 0, 5);
 scene.add(dummy1);
+
+const dummy2Geo = new THREE.CylinderGeometry();
 
 // const floorGeometry = new THREE.PlaneBufferGeometry(300, 300, 100, 100);
 // floorGeometry.rotateX(-Math.PI / 2);
@@ -163,8 +170,6 @@ joyStick.on('move', (event, data) => {
     model1.animations.runAndPunch.setLoop(THREE.LoopRepeat);
     model1.scene.rotation.y = data.angle.radian + Math.PI / 2;
     velocity = findTriangleSide(data.angle.degree, data.distance);
-    // model1.position.x += velocity.adjacent / 200;
-    // model1.position.z += -(velocity.opposite / 200);
     // console.log(model1.scene.position);
     // console.log(model1.scene.position);
     // console.log(model1.sceneShape.position);
@@ -223,19 +228,28 @@ function movePlayer(delta) {
 }
 function pushEnemyAway() {}
 function checkCollision(mainTarget, secondTarget) {
-  let mainTargetPos = calculateFourSide(mainTarget.scene.position);
-  let pos = secondTarget.position;
-  if (mainTargetPos[0].x < pos.x && mainTargetPos[1].x > pos.x) {
+  let { distance, radian } = calculateDistanceAndRadianBetweenTwoPoints(
+    mainTarget.scene.position,
+    secondTarget.position
+  );
+  if (distance < PUSHRANGE) {
     if (
-      mainTargetPos[0].z < pos.z &&
-      mainTargetPos[1].z < pos.z &&
-      mainTargetPos[2].z > pos.z &&
-      mainTargetPos[3].z > pos.z
+      mainTarget.scene.rotation.y + PUSHRADIAN / 2 > radian &&
+      mainTarget.scene.rotation.y - PUSHRADIAN / 2 < radian
     ) {
       console.log('collision');
-      applyForce(mainTarget.scene, secondTarget);
+      //     applyForce(mainTarget.scene, secondTarget);
     }
   }
+}
+function calculateDistanceAndRadianBetweenTwoPoints(pointOne, pointTwo) {
+  let a = pointTwo.x - pointOne.x;
+  let b = pointTwo.z - pointOne.z;
+  let temp = Math.atan2(b * -1, a);
+  if (temp < 0) {
+    temp += Math.PI * 2;
+  }
+  return { distance: Math.sqrt(a * a + b * b), radian: temp + Math.PI / 2 };
 }
 function calculateFourSide({ x, z }) {
   let hitBoxGrid = []; //[0] = A, [1] = B, [2] = C, [3] = D
