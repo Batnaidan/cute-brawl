@@ -237,12 +237,6 @@ function checkCollision(mainTarget, secondTarget) {
     }
   }
 }
-function triggerCollision(event) {
-  console.log(event.body);
-  // if (event.body === dummy1Box) {
-  //   console.log('Model has ented');
-  // }
-}
 function calculateFourSide({ x, z }) {
   let hitBoxGrid = []; //[0] = A, [1] = B, [2] = C, [3] = D
   hitBoxGrid.push({
@@ -263,8 +257,6 @@ function calculateFourSide({ x, z }) {
   });
   return hitBoxGrid;
 }
-function calculateOppositeAndAdjacent(x1, z1, x2, z2) {}
-
 function applyForce(firstTarget, secondTarget) {
   let force = 100;
   let a = secondTarget.position.x - firstTarget.position.x;
