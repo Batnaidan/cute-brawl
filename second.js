@@ -288,3 +288,4 @@ function applyForce() {
   console.log(force);
   box.applyForce(force);
 }
+//version1 somewhat working example with physics, collision etc.
