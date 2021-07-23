@@ -102,8 +102,7 @@ function loadModel(url) {
   });
 }
 
-let model1,
-  model2 = {};
+let model1, model2;
 let p1 = loadModel('./resources/model/modelv2_stand_with_punchv2.glb').then(
   (result) => {
     model1 = result;
@@ -128,64 +127,94 @@ let p1 = loadModel('./resources/model/modelv2_stand_with_punchv2.glb').then(
 
 class Player {
   constructor(uuid, position, rotation) {
-    this._promise = loadModel(
-      './resources/model/modelv2_stand_with_punchv2.glb'
-    ).then((result) => {
-      this.scene = result.scene;
-      this.animations = result.animations;
-      this.mixer = new THREE.AnimationMixer(this.scene);
-      this.scene.rotation.y = Math.PI;
-      this.scene.name = uuid;
-      this.animations.stand = this.mixer.clipAction(this.animations[10]);
-      this.animations.stand.clampWhenFinished = true;
-      this.animations.stand.setLoop(THREE.LoopRepeat);
-      camera.lookAt(this.scene.position);
-      loadModel('./resources/model/modelv2_run_with_punchv5.glb').then(
-        (runModel) => {
-          this.animations.runAndPunch = this.mixer.clipAction(
-            runModel.animations[0]
-          );
-          this.animations.runAndPunch.clampWhenFinished = true;
-          this.animations.runAndPunch.setLoop(THREE.LoopRepeat);
-          this.animations.stand.play();
-        }
-      );
-    });
+    // this.scene = new THREE.Group();
+    // model1.scene.name = uuid;
+    // this.scene.copy(model1.scene);
+    // this.scene.name = uuid;
+    // this.scene.position.set(0, 0, 0);
+    // this.scene.rotation.set(0, Math.PI, 0, 'XYZ');
+    // this.mixer = new THREE.AnimationMixer(this.scene);
+    // this.animations = model1.animations;
+    // this.animations.stand.clampWhenFinished = true;
+    // this.animations.stand.setLoop(THREE.LoopRepeat);
+    //     model1.animations.runAndPunch = model1.mixer.clipAction(
+    //   runModel.animations[0]
+    // );
+    // model1.animations.runAndPunch.clampWhenFinished = true;
+    // model1.animations.runAndPunch.setLoop(THREE.LoopRepeat);
+    // model1.animations.stand.play();
+
+    loadModel('./resources/model/modelv2_stand_with_punchv2.glb').then(
+      (result) => {
+        this.scene = result.scene;
+        this.animations = result.animations;
+        this.mixer = new THREE.AnimationMixer(this.scene);
+        this.scene.rotation.y = Math.PI;
+        this.scene.name = uuid;
+        this.animations.stand = this.mixer.clipAction(this.animations[10]);
+        this.animations.stand.clampWhenFinished = true;
+        this.animations.stand.setLoop(THREE.LoopRepeat);
+        camera.lookAt(this.scene.position);
+        loadModel('./resources/model/modelv2_run_with_punchv5.glb').then(
+          (runModel) => {
+            this.animations.runAndPunch = this.mixer.clipAction(
+              runModel.animations[0]
+            );
+            this.animations.runAndPunch.clampWhenFinished = true;
+            this.animations.runAndPunch.setLoop(THREE.LoopRepeat);
+            this.animations.stand.play();
+          }
+        );
+      }
+    );
   }
 }
-Promise.all([p1]).then(() => {
-  // model1.scene.position.set(0, 0, 0);
-  // model1.scene.name = socket.id;
-  // model2.scene = new THREE.Group();
-  // model2.scene.copy(model1.scene);
-  // console.log(model2);
-  // console.log(model1.scene);
-  let model3 = new Player(
-    model1.scene.name,
-    model1.scene.position,
-    model1.scene.rotation
-  );
-  console.log(model3);
-  // scene.add(model3.scene);
-  socket.on('players', (res) => {
-    PLAYERS = res;
-    res.map((el, index) => {
-      el.scene = model1.scene;
-    });
+
+// Promise.all([p1]).then(() => {
+//   // model1.scene.position.set(0, 0, 0);
+//   // model2.scene = new THREE.Group();
+//   // model2.scene.copy(model1.scene);
+//   // console.log(model2);
+//   // console.log(model1.scene);
+
+//   model1 = new Player(
+//     socket.id
+//     // model1.scene.position,
+//     // model1.scene.rotation
+//   );
+//   // model1.scene.position.y += 5;
+//   console.log(scene);
+//   scene.add(model1.scene);
+//   window.setInterval(() => {
+//     PLAYERS.map((el, index) => {
+//       checkCollision(model1, dummy1);
+//     });
+//   }, 1000);
+// });
+
+socket.on('connect', (res) => {
+  console.log(socket.id);
+  Promise.all([p1]).then(() => {
+    scene.add(model1);
   });
   socket.emit('playerAdd', {
-    uuid: model1.scene.name,
+    uuid: socket.id,
     position: model1.scene.position,
-    rotation: model1.scene.rotation,
+    rotation: model1.scene.rotation.y,
   });
-  window.setInterval(() => {
-    PLAYERS.map((el, index) => {
-      checkCollision(model1, dummy1);
-    });
-  }, 1000);
 });
+socket.on('players', (players) => {
+  players.forEach((element) => {
+    if (element.uuid !== socket.id) {
+      console.log(element);
+    }
+  });
+});
+// socket.on('playerAdd', (res) => {
+//   PLAYERS.push(res);
+// })
 
-socket.on('players', (res) => {});
+// socket.on('players', (res) => {});
 
 joyStick.on('move', (event, data) => {
   if (model1) {
@@ -236,6 +265,8 @@ function movePlayer(player, delta) {
         position: player.scene.position,
         rotation: player.scene.rotation,
       });
+    } else {
+      // scene.remove()
     }
     // camera.position.z -= (velocity.opposite / SPEED) * delta;
   }
